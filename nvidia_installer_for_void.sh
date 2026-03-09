@@ -1,15 +1,15 @@
 #!/bin/bash
  
 # ==============================================================================
-# Script to prepare NVIDIA driver installation with DKMS (v1.2)
+# Script to prepare NVIDIA driver installation with DKMS (v1.3)
 # for the 'nvidia-open' kernel modules on Void Linux.
 #
-# Version: 1.2 (With optional installer start at the end)
+# Version: 1.3 (With optional installer start at the end)
 #
 # NOTE: This script is intended for advanced users.
 # Use at your own risk!
 # ==============================================================================
- 
+
 # --- Configuration & Color Variables ---
 set -e
 GREEN='\033[0;32m'
@@ -48,8 +48,6 @@ if [ -z "$VERSION" ]; then
 fi
 DKMS_MODULE_NAME="nvidia-open"
 DKMS_SRC_DIR="/usr/src/${DKMS_MODULE_NAME}-${VERSION}"
-
-# Änderung 1: Wir nutzen /var/tmp, da /tmp (tmpfs) oft zu klein für neue Treiber ist
 TEMP_EXTRACT_DIR="/var/tmp/nvidia-installer-extraction"
 
 echo "  -> Detected driver version: ${YELLOW}${VERSION}${NC}"
@@ -63,20 +61,17 @@ rm -rf "$DKMS_SRC_DIR"
 
 # --- 5. Extract Driver ---
 echo -e "\n${GREEN}Step 5: Extracting kernel sources from the installer...${NC}"
-mkdir -p "$TEMP_EXTRACT_DIR/extract"
+# Wir erstellen nur das übergeordnete Verzeichnis. Den Ordner "extract" baut der Installer selbst.
+mkdir -p "$TEMP_EXTRACT_DIR"
 
-# Änderung 2: Fehler beim Entpacken abfangen, anstatt sie zu ignorieren
 if ! sh "$INSTALLER_PATH" -x --target "$TEMP_EXTRACT_DIR/extract"; then
     echo -e "${RED}Error: Extraction failed! Check your disk space in /var/tmp or the installer file.${NC}"
     exit 1
 fi
 
-# Änderung 3: Robuste Erkennung des Zielverzeichnisses
 if [ -d "$TEMP_EXTRACT_DIR/extract/kernel" ]; then
-    # Variante A: NVIDIA hat die Dateien direkt ins Target entpackt
     EXTRACTED_DIR="$TEMP_EXTRACT_DIR/extract"
 else
-    # Variante B: NVIDIA hat einen Unterordner erstellt
     EXTRACTED_DIR=$(find "$TEMP_EXTRACT_DIR/extract" -maxdepth 1 -type d -name "NVIDIA-Linux-x86_64-*" | head -n 1)
 fi
 
