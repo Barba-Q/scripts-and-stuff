@@ -1,13 +1,7 @@
 #!/bin/bash
- 
 # ==============================================================================
-# Script to prepare NVIDIA driver installation with DKMS (v1.3)
+# Script to prepare NVIDIA driver installation with DKMS (v1.4)
 # for the 'nvidia-open' kernel modules on Void Linux.
-#
-# Version: 1.3 (With optional installer start at the end)
-#
-# NOTE: This script is intended for advanced users.
-# Use at your own risk!
 # ==============================================================================
 
 # --- Configuration & Color Variables ---
@@ -61,7 +55,6 @@ rm -rf "$DKMS_SRC_DIR"
 
 # --- 5. Extract Driver ---
 echo -e "\n${GREEN}Step 5: Extracting kernel sources from the installer...${NC}"
-# Wir erstellen nur das übergeordnete Verzeichnis. Den Ordner "extract" baut der Installer selbst.
 mkdir -p "$TEMP_EXTRACT_DIR"
 
 if ! sh "$INSTALLER_PATH" -x --target "$TEMP_EXTRACT_DIR/extract"; then
@@ -101,7 +94,7 @@ DEST_MODULE_LOCATION[1]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[2]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[3]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[4]="/kernel/drivers/video"
-MAKE[0]="make -j\$(nproc) module-type=open"
+MAKE[0]="'make' -j\$(nproc) KERNEL_UNAME=\${kernelver} SYSSRC=/lib/modules/\${kernelver}/build IGNORE_CC_MISMATCH=1 module-type=open"
 AUTOINSTALL="yes"
 EOF
 
