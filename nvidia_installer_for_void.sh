@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script to prepare NVIDIA driver installation with DKMS (v1.4)
+# Script to prepare NVIDIA driver installation with DKMS (v1.5)
 # for the 'nvidia-open' kernel modules on Void Linux.
 # ==============================================================================
 
@@ -80,6 +80,14 @@ echo -e "\n${GREEN}Step 6: Setting up DKMS for the new modules...${NC}"
 echo "  -> Copying kernel modules to ${DKMS_SRC_DIR}..."
 mkdir -p "$DKMS_SRC_DIR"
 cp -r ./kernel/* "$DKMS_SRC_DIR/"
+
+# NEW: Fix for NVIDIA 580.x stray Tegra headers on x86_64
+echo "  -> Patching out stray Tegra headers (NVIDIA bug)..."
+if [ -f "$DKMS_SRC_DIR/nvidia/nv-clk.c" ]; then
+    sed -i 's|#include <soc/tegra/bpmp-abi.h>|/* & */|' "$DKMS_SRC_DIR/nvidia/nv-clk.c"
+    sed -i 's|#include <soc/tegra/bpmp.h>|/* & */|' "$DKMS_SRC_DIR/nvidia/nv-clk.c"
+fi
+
 echo "  -> Creating dkms.conf..."
 cat << EOF > "${DKMS_SRC_DIR}/dkms.conf"
 PACKAGE_NAME="${DKMS_MODULE_NAME}"
