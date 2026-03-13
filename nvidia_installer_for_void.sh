@@ -1,8 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# Script to prepare NVIDIA driver installation with DKMS (v2.1)
-#
-# FIXED: Proper dracut timing & Open Modules restored!
+# Script to prepare NVIDIA driver installation with DKMS (v2.2)
+# OPEN MODULES(Void Linux).
+# ADDED: Automated Scorched-Earth cleanup & Dracut Firmware Override.
 # ==============================================================================
 
 set -e
@@ -39,7 +39,7 @@ fi
 DKMS_MODULE_NAME="nvidia-open"
 DKMS_SRC_DIR="/usr/src/${DKMS_MODULE_NAME}-${VERSION}"
 TEMP_EXTRACT_DIR="/var/tmp/nvidia-installer-extraction"
-echo "  -> Version: ${YELLOW}${VERSION}${NC}"
+echo "  -> Target Version: ${YELLOW}${VERSION}${NC}"
 
 echo -e "\n${GREEN}Step 4: Configuring GRUB and disabling nouveau...${NC}"
 GRUB_FILE="/etc/default/grub"
@@ -57,10 +57,13 @@ if grep -q "GRUB_CMDLINE_LINUX_DEFAULT" "$GRUB_FILE"; then
     fi
 fi
 
-echo -e "\n${GREEN}Step 5: Cleaning up old installations...${NC}"
+echo -e "\n${GREEN}Step 5: SCORCHED EARTH - Cleaning up all previous NVIDIA modules...${NC}"
 rm -rf "$TEMP_EXTRACT_DIR"
-dkms remove "nvidia/${VERSION}" --all || true
-dkms remove "nvidia-open/${VERSION}" --all || true
+# Find and remove any installed nvidia or nvidia-open modules from DKMS
+for module in $(dkms status | grep -E "^(nvidia|nvidia-open)/" | awk -F', ' '{print $1}'); do
+    echo "  -> Purging old module: $module"
+    dkms remove "${module}" --all || true
+done
 rm -rf "$DKMS_SRC_DIR"
 
 echo -e "\n${GREEN}Step 6: Extracting kernel sources...${NC}"
@@ -98,7 +101,6 @@ DEST_MODULE_LOCATION[1]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[2]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[3]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[4]="/kernel/drivers/video"
-# BACK TO OPEN MODULES:
 MAKE[0]="'make' -j\$(nproc) KERNEL_UNAME=\${kernelver} SYSSRC=/lib/modules/\${kernelver}/build IGNORE_CC_MISMATCH=1 module-type=open"
 AUTOINSTALL="yes"
 EOF
@@ -115,8 +117,12 @@ cd /
 echo -e "\n${GREEN}Step 10: Installing userspace libraries & firmware silently...${NC}"
 sh "${INSTALLER_PATH}" -s --no-kernel-module --install-libglvnd --run-nvidia-xconfig
 
-echo -e "\n${GREEN}Step 11: Rebuilding initramfs with new modules and GSP firmware...${NC}"
+echo -e "\n${GREEN}Step 11: Forcing Dracut to include GSP Firmware...${NC}"
+mkdir -p /etc/dracut.conf.d
+echo 'install_items+=" /lib/firmware/nvidia/* "' > /etc/dracut.conf.d/20-nvidia-fw.conf
+
+echo -e "\n${GREEN}Step 12: Rebuilding initramfs with new modules and GSP firmware...${NC}"
 dracut --force
 
 echo -e "\n\n${GREEN}========================= INSTALLATION COMPLETE! ==========================${NC}"
-echo -e "Reboot your machine. The firmware is now correctly packaged. You should finally have display output!"
+echo -e "Reboot your machine. The firmware is now hardcoded into your boot image."
