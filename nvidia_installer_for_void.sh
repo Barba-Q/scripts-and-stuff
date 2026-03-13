@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# Script to prepare NVIDIA driver installation with DKMS (v1.8)
-# FULLY automated with auto-detection and silent install for Void Linux.
+# Script to prepare NVIDIA driver installation with DKMS (v2.1)
+#
+# FIXED: Proper dracut timing & Open Modules restored!
 # ==============================================================================
 
 set -e
@@ -16,11 +17,9 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Auto-detect the newest NVIDIA .run file in the current directory
 INSTALLER_FILE=$(find . -maxdepth 1 -type f -name "NVIDIA-Linux-x86_64-*.run" | sort -V | tail -n 1)
 if [ -z "$INSTALLER_FILE" ]; then
     echo -e "${RED}Error: No NVIDIA .run file found in the current directory!${NC}"
-    echo -e "Please put this script in the same folder as your downloaded driver."
     exit 1
 fi
 INSTALLER_PATH=$(realpath "$INSTALLER_FILE")
@@ -35,6 +34,8 @@ if [ -z "$VERSION" ]; then
     echo -e "${RED}Error: Could not extract version number.${NC}"
     exit 1
 fi
+
+# OPEN MODULE NAME FOR 50-SERIES:
 DKMS_MODULE_NAME="nvidia-open"
 DKMS_SRC_DIR="/usr/src/${DKMS_MODULE_NAME}-${VERSION}"
 TEMP_EXTRACT_DIR="/var/tmp/nvidia-installer-extraction"
@@ -44,25 +45,22 @@ echo -e "\n${GREEN}Step 4: Configuring GRUB and disabling nouveau...${NC}"
 GRUB_FILE="/etc/default/grub"
 if grep -q "GRUB_CMDLINE_LINUX_DEFAULT" "$GRUB_FILE"; then
     if ! grep -q "nvidia-drm.modeset=1" "$GRUB_FILE"; then
-        echo "  -> Injecting DRM modeset and nouveau blacklist into GRUB..."
         sed -i 's/^\(GRUB_CMDLINE_LINUX_DEFAULT="[^\"]*\)"/\1 rd.driver.blacklist=nouveau nouveau.modeset=0 nvidia-drm.modeset=1"/' "$GRUB_FILE"
         if command -v update-grub &> /dev/null; then
             update-grub
         else
             grub-mkconfig -o /boot/grub/grub.cfg
         fi
-        echo "  -> Rebuilding initramfs (dracut)..."
-        dracut --force
+        echo "  -> GRUB updated successfully."
     else
-        echo "  -> GRUB already correctly configured."
+        echo "  -> GRUB already configured."
     fi
-else
-    echo -e "${YELLOW}Warning: Could not automatically patch GRUB.${NC}"
 fi
 
 echo -e "\n${GREEN}Step 5: Cleaning up old installations...${NC}"
 rm -rf "$TEMP_EXTRACT_DIR"
-dkms remove "${DKMS_MODULE_NAME}/${VERSION}" --all || true
+dkms remove "nvidia/${VERSION}" --all || true
+dkms remove "nvidia-open/${VERSION}" --all || true
 rm -rf "$DKMS_SRC_DIR"
 
 echo -e "\n${GREEN}Step 6: Extracting kernel sources...${NC}"
@@ -82,7 +80,6 @@ echo -e "\n${GREEN}Step 7: Setting up DKMS...${NC}"
 mkdir -p "$DKMS_SRC_DIR"
 cp -r ./kernel/* "$DKMS_SRC_DIR/"
 
-echo "  -> Patching out stray Tegra headers (NVIDIA bug)..."
 if [ -f "$DKMS_SRC_DIR/nvidia/nv-clk.c" ]; then
     sed -i 's|#include <soc/tegra/bpmp-abi.h>|/* & */|' "$DKMS_SRC_DIR/nvidia/nv-clk.c"
     sed -i 's|#include <soc/tegra/bpmp.h>|/* & */|' "$DKMS_SRC_DIR/nvidia/nv-clk.c"
@@ -101,23 +98,25 @@ DEST_MODULE_LOCATION[1]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[2]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[3]="/kernel/drivers/video"
 DEST_MODULE_LOCATION[4]="/kernel/drivers/video"
+# BACK TO OPEN MODULES:
 MAKE[0]="'make' -j\$(nproc) KERNEL_UNAME=\${kernelver} SYSSRC=/lib/modules/\${kernelver}/build IGNORE_CC_MISMATCH=1 module-type=open"
 AUTOINSTALL="yes"
 EOF
 
-echo -e "\n${GREEN}Step 8: Building modules via DKMS...${NC}"
+echo -e "\n${GREEN}Step 8: Building OPEN modules via DKMS...${NC}"
 dkms add -m "${DKMS_MODULE_NAME}" -v "${VERSION}"
 dkms build -m "${DKMS_MODULE_NAME}" -v "${VERSION}"
 dkms install -m "${DKMS_MODULE_NAME}" -v "${VERSION}"
 
-echo -e "\n${GREEN}Step 9: Cleaning up...${NC}"
+echo -e "\n${GREEN}Step 9: Cleaning up extraction temp files...${NC}"
 rm -rf "$TEMP_EXTRACT_DIR"
 cd /
 
-echo -e "\n${GREEN}Step 10: Installing userspace libraries silently...${NC}"
-# The '-s' flag runs the NVIDIA installer completely silently without prompts
+echo -e "\n${GREEN}Step 10: Installing userspace libraries & firmware silently...${NC}"
 sh "${INSTALLER_PATH}" -s --no-kernel-module --install-libglvnd --run-nvidia-xconfig
 
+echo -e "\n${GREEN}Step 11: Rebuilding initramfs with new modules and GSP firmware...${NC}"
+dracut --force
+
 echo -e "\n\n${GREEN}========================= INSTALLATION COMPLETE! ==========================${NC}"
-echo -e "The driver is installed and Xorg is configured."
-echo -e "Please ${YELLOW}REBOOT${NC} your system now."
+echo -e "Reboot your machine. The firmware is now correctly packaged. You should finally have display output!"
