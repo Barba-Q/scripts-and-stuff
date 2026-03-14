@@ -1,8 +1,9 @@
-#!/bin/bash
+ #!/bin/bash
 # ==============================================================================
 # Script to prepare NVIDIA driver installation with DKMS (v2.2)
 # OPEN MODULES(Void Linux).
 # ADDED: Automated Scorched-Earth cleanup & Dracut Firmware Override.
+# special thanks to jvassalo 
 # ==============================================================================
 
 set -e
