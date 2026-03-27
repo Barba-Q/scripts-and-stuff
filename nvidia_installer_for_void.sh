@@ -126,4 +126,4 @@ echo -e "\n${GREEN}Step 12: Rebuilding initramfs with new modules and GSP firmwa
 dracut --force
 
 echo -e "\n\n${GREEN}========================= INSTALLATION COMPLETE! ==========================${NC}"
-echo -e "Reboot your machine. The firmware is now hardcoded into your boot image."
+echo -e "Reboot your machine."
